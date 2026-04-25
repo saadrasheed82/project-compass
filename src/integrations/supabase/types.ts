@@ -312,6 +312,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      lookup_group_by_invite: {
+        Args: { _invite_code: string }
+        Returns: {
+          capacity: number
+          id: string
+          member_count: number
+          name: string
+        }[]
+      }
     }
     Enums: {
       app_role: "teacher" | "student"

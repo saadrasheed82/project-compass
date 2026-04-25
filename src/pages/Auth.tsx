@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { GraduationCap, Sparkles } from "lucide-react";
+import { GraduationCap, Sparkles, UserRoundCog, UsersRound } from "lucide-react";
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -27,6 +27,26 @@ export default function Auth() {
   const [emailL, setEmailL] = useState("");
   const [pwL, setPwL] = useState("");
 
+  const signInWithDemo = async (demoRole: "teacher" | "student") => {
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ensure-demo-account", {
+        body: { role: demoRole },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
+      if (loginError) throw loginError;
+    } catch (err: any) {
+      toast.error(err.message ?? "Demo login failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   useEffect(() => {
     if (!loading && user && role) {
       navigate(role === "teacher" ? "/teacher" : "/student", { replace: true });
@@ -38,22 +58,16 @@ export default function Auth() {
     setBusy(true);
     try {
       // Validate invite code first
-      const { data: group, error: gErr } = await supabase
-        .from("groups")
-        .select("id, name, capacity")
-        .eq("invite_code", code.trim())
-        .maybeSingle();
-      if (gErr || !group) {
+      const { data: group, error: gErr } = await (supabase as any)
+        .rpc("lookup_group_by_invite", { _invite_code: code });
+      const matchedGroup = group?.[0];
+      if (gErr || !matchedGroup) {
         toast.error("Invalid invite code. Ask your teacher for the correct code.");
         setBusy(false);
         return;
       }
-      const { count } = await supabase
-        .from("group_members")
-        .select("*", { count: "exact", head: true })
-        .eq("group_id", group.id);
-      if ((count ?? 0) >= group.capacity) {
-        toast.error(`Group "${group.name}" is full.`);
+      if (Number(matchedGroup.member_count ?? 0) >= matchedGroup.capacity) {
+        toast.error(`Group "${matchedGroup.name}" is full.`);
         setBusy(false);
         return;
       }
@@ -70,9 +84,9 @@ export default function Auth() {
       if (data.user) {
         const { error: jErr } = await supabase
           .from("group_members")
-          .insert({ group_id: group.id, user_id: data.user.id });
+          .insert({ group_id: matchedGroup.id, user_id: data.user.id });
         if (jErr) console.warn(jErr);
-        toast.success(`Welcome! You've joined ${group.name}.`);
+        toast.success(`Welcome! You've joined ${matchedGroup.name}.`);
       }
     } catch (err: any) {
       toast.error(err.message ?? "Signup failed");
@@ -127,6 +141,14 @@ export default function Auth() {
                 <Button type="submit" disabled={busy} className="w-full bg-gradient-primary hover:opacity-90">
                   {busy ? "Signing in..." : "Login"}
                 </Button>
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <Button type="button" variant="outline" disabled={busy} onClick={() => signInWithDemo("teacher")}>
+                    <UserRoundCog className="w-4 h-4" /> Teacher demo
+                  </Button>
+                  <Button type="button" variant="outline" disabled={busy} onClick={() => signInWithDemo("student")}>
+                    <UsersRound className="w-4 h-4" /> Student demo
+                  </Button>
+                </div>
               </form>
             </TabsContent>
 
@@ -157,7 +179,7 @@ export default function Auth() {
         </Card>
 
         <p className="text-center text-xs text-primary-foreground/70 mt-6">
-          Teachers: ask the admin to seed your account.
+          Use Teacher demo for instant access, or students can join with a teacher invite code.
         </p>
       </div>
     </div>
