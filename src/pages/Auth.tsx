@@ -58,7 +58,7 @@ export default function Auth() {
     setBusy(true);
     try {
       // Validate invite code first
-      const { data: group, error: gErr } = await supabase
+      const { data: group, error: gErr } = await (supabase as any)
         .rpc("lookup_group_by_invite", { _invite_code: code });
       const matchedGroup = group?.[0];
       if (gErr || !matchedGroup) {
@@ -141,6 +141,14 @@ export default function Auth() {
                 <Button type="submit" disabled={busy} className="w-full bg-gradient-primary hover:opacity-90">
                   {busy ? "Signing in..." : "Login"}
                 </Button>
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <Button type="button" variant="outline" disabled={busy} onClick={() => signInWithDemo("teacher")}>
+                    <UserRoundCog className="w-4 h-4" /> Teacher demo
+                  </Button>
+                  <Button type="button" variant="outline" disabled={busy} onClick={() => signInWithDemo("student")}>
+                    <UsersRound className="w-4 h-4" /> Student demo
+                  </Button>
+                </div>
               </form>
             </TabsContent>
 
@@ -171,7 +179,7 @@ export default function Auth() {
         </Card>
 
         <p className="text-center text-xs text-primary-foreground/70 mt-6">
-          Teachers: ask the admin to seed your account.
+          Use Teacher demo for instant access, or students can join with a teacher invite code.
         </p>
       </div>
     </div>
